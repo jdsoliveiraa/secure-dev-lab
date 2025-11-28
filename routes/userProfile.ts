@@ -52,19 +52,14 @@ export function getUserProfile () {
 
     let username = user.username
 
+    // Do not execute or evaluate user-controlled content. Encode all username
+    // output as HTML entities so any embedded code or template markers are
+    // displayed literally and cannot be executed by the server or the browser.
     if (username?.match(/#{(.*)}/) !== null && utils.isChallengeEnabled(challenges.usernameXssChallenge)) {
       req.app.locals.abused_ssti_bug = true
-      const code = username?.substring(2, username.length - 1)
-      try {
-        if (!code) {
-          throw new Error('Username is null')
-        }
-        username = eval(code) // eslint-disable-line no-eval
-      } catch (err) {
-        username = '\\' + username
-      }
+      username = entities.encode(username ?? '')
     } else {
-      username = '\\' + username
+      username = entities.encode(username ?? '')
     }
 
     const themeKey = config.get<string>('application.theme') as keyof typeof themes
