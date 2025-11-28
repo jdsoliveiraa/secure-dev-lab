@@ -132,12 +132,49 @@ export const redirectAllowlist = new Set([
   'http://leanpub.com/juice-shop'
 ])
 
-export const isRedirectAllowed = (url: string) => {
-  let allowed = false
-  for (const allowedUrl of redirectAllowlist) {
-    allowed = allowed || url.includes(allowedUrl) // vuln-code-snippet vuln-line redirectChallenge
+// Build a set of allowed origins (scheme + host + optional port) derived from the
+// full URLs in `redirectAllowlist`. This enables strict origin checking instead
+// of unsafe substring matching which could be abused by crafted URLs.
+const redirectAllowlistOrigins = new Set<string>()
+for (const allowedUrl of redirectAllowlist) {
+  try {
+    // Use the WHATWG URL parser to reliably extract origin
+    const parsed = new URL(allowedUrl)
+    redirectAllowlistOrigins.add(parsed.origin)
+  } catch (err) {
+    // Ignore entries that are not valid absolute URLs
   }
-  return allowed
+}
+
+export const isRedirectAllowed = (url: string) => {
+  if (!url) {
+    return false
+  }
+
+  // Allow same-origin or application-relative redirects
+  if (url.startsWith('/')) {
+    return true
+  }
+
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch (err) {
+    // Not a valid absolute URL -> disallow
+    return false
+  }
+
+  // Only allow http(s) schemes
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return false
+  }
+
+  // Allow only when the origin (scheme + host + port) exactly matches an allowlisted origin
+  if (redirectAllowlistOrigins.has(parsed.origin)) {
+    return true
+  }
+
+  return false
 }
 // vuln-code-snippet end redirectCryptoCurrencyChallenge redirectChallenge
 
